@@ -1,5 +1,15 @@
 import xml.etree.ElementTree as et
+# from collections import deque
 from queue import Queue
+
+
+
+'''
+class petriNet:
+    + places = {place_id : current mark in place}
+    + transitimns = {transition_id : transition_name}
+    + arcs = {(source, target, weight)}
+'''
 
 class PetriNet:
     def __init__(self):
@@ -7,7 +17,7 @@ class PetriNet:
         self.transitions = {}
         self.arcs = []
 
-def read_pnmlFile(filepath: str) -> PetriNet:
+def read_pnmlFile(filepath : str)->PetriNet:
     tree = et.parse(filepath)
     root = tree.getroot()
     
@@ -15,80 +25,69 @@ def read_pnmlFile(filepath: str) -> PetriNet:
 
     for place in root.findall(".//place"):
         id = place.get("id")
-        initial_marking = place.findtext(".//initialMarking/text", default="0")
-        net.places[id] = int(initial_marking)
+        net.places[id] = place.findtext(".//initialMarking/text", default="0")
 
     for tran in root.findall(".//transition"):
         id = tran.get("id")
         net.transitions[id] = tran.findtext(".//name/text", default=id)
 
+    # đọc arc kèm trọng số
     for arc in root.findall(".//arc"):
         source = arc.get("source")
         target = arc.get("target")
-        weight = int(arc.findtext(".//inscription/text", default="1"))
+        weight = int(arc.findtext(".//inscription/text", default="1"))  # nếu không có thì =1
         net.arcs.append((source, target, weight))
-    
     return net
 
-def all_reachable_marking(net: PetriNet) -> list[dict]:
-    # Cấu trúc dữ liệu để lưu thông tin về các cung
-    inp = {}  # place -> transition
-    outp = {}  # transition -> place  
-    inp_w = {}  # trọng số cung input: (place, transition) -> weight
-    outp_w = {}  # trọng số cung output: (transition, place) -> weight
 
-    # Phân loại các cung và lưu trọng số
-    for source, target, weight in net.arcs:
-        if source in net.places:  # Cung từ place đến transition
+
+
+# find all_reachable_marking
+#   + input : PetriNet
+#   + ouput : list of dict {place : tokens}
+def all_reachable_marking(net : PetriNet)->list[dict]:
+    inp = {}
+    outp = {}
+    inp_w = {}   # trọng số của cung vào transition
+    outp_w = {}  # trọng số của cung ra transition
+
+    for source, target, w in net.arcs:
+        if source in net.places:
             inp.setdefault(target, []).append(source)
-            inp_w[(source, target)] = weight
-        elif source in net.transitions:  # Cung từ transition đến place
+            inp_w[(source, target)] = w
+        elif source in net.transitions:
             outp.setdefault(source, []).append(target)
-            outp_w[(source, target)] = weight
+            outp_w[(source, target)] = w
 
-    # Marking ban đầu
-    initial_marking = {p: count for p, count in net.places.items()}
-    
-    visited = {tuple(sorted(initial_marking.items()))}
+    ini = {p : int(count) for p, count in net.places.items()}
+    visited = [ini]
+
     queue = Queue()
-    queue.put(initial_marking)
+    queue.put(ini)
 
     while not queue.empty():
-        marking = queue.get()
-        
-        for transition_id in net.transitions:
-            # Kiểm tra transition có thể bắn
-            transition_inputs = inp.get(transition_id, [])
-            
-            can_fire = True
-            for place_id in transition_inputs:
-                required_tokens = inp_w.get((place_id, transition_id), 1)
-                if marking.get(place_id, 0) < required_tokens:
-                    can_fire = False
-                    break
-            
-            if can_fire:
+        marking  = queue.get()
+        for tran in net.transitions:
+            tran_in = inp.get(tran, [])
+            tran_out = outp.get(tran, [])
+
+            # kiểm tra có thể fire (mỗi input place đủ token theo trọng số)
+            fire = all(marking[p] >= inp_w[(p, tran)] for p in tran_in)
+            if fire:
                 new_marking = dict(marking)
-                
-                for place_id in transition_inputs:
-                    required_tokens = inp_w.get((place_id, transition_id), 1)
-                    new_marking[place_id] -= required_tokens
-                
-                transition_outputs = outp.get(transition_id, [])
-                for place_id in transition_outputs:
-                    added_tokens = outp_w.get((transition_id, place_id), 1)
-                    new_marking[place_id] = new_marking.get(place_id, 0) + added_tokens
-                
-                new_tuple = tuple(sorted(new_marking.items()))
-                if new_tuple not in visited:
-                    visited.add(new_tuple)
+                for i in tran_in:
+                    new_marking[i] -= inp_w[(i, tran)]
+                for o in tran_out:
+                    new_marking[o] += outp_w.get((tran, o), 1)
+                if new_marking not in visited:
+                    visited.append(new_marking)
                     queue.put(new_marking)
 
-    return [dict(v) for v in visited]
+    return visited
 
 # Test
 try:
-    net = read_pnmlFile("test1.pnml")
+    net = read_pnmlFile("./test_file_pnml/test1.pnml")
     print("Read file success!")
     print("Places:", net.places)
     print("Transitions:", net.transitions)
@@ -100,6 +99,6 @@ try:
         print(f"Marking {i+1}: {marking}")
         
 except FileNotFoundError:
-    print("Error: File 'test2.pnml' not found!")
+    print("Error: File test file not found!")
 except Exception as e:
     print(f"Error: {e}")
