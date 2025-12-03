@@ -2,7 +2,8 @@ from queue import Queue
 import psutil
 import os
 import time
-import xml.etree.ElementTree as et
+
+import pm4py
 
 # BDD - using dd instead of pyeda
 import dd.autoref as bdd
@@ -41,66 +42,26 @@ class PetriNet:
 # task 1
 
 def read_pnmlFile(filepath: str) -> PetriNet:
-    tree = et.parse(filepath)
-    root = tree.getroot()
+    net_pm4py, initial_marking, final_marking = pm4py.read_pnml(filepath)
 
     net = PetriNet()
-
-    # remove namespace
-    for elem in root.iter():
-        if '}' in elem.tag:
-            elem.tag = elem.tag.split('}', 1)[1]
-
-
-    # find all places
-    for place in root.findall(".//place"):
-        pid = place.get("id")
-        initial_marking = place.find("initialMarking")
-        if initial_marking is not None:
-            text_elem = initial_marking.find("text")
-            if text_elem is not None and text_elem.text:
-                net.places[pid] = text_elem.text
-            else:
-                net.places[pid] = "0"
-        else:
-            net.places[pid] = "0"
-
-    # find all transitions
-    for tran in root.findall(".//transition"):
-        tid = tran.get("id")
-        name_elem = tran.find("name")
-        if name_elem is not None:
-            text_elem = name_elem.find("text")
-            if text_elem is not None and text_elem.text:
-                net.transitions[tid] = text_elem.text
-            else:
-                net.transitions[tid] = tid
-        else:
-            net.transitions[tid] = tid
-
-    # find all arcs
-    for arc in root.findall(".//arc"):
-        source = arc.get("source")
-        target = arc.get("target")
-
-        inscription = arc.find("inscription")
-        if inscription is not None:
-            text_elem = inscription.find("text")
-            if text_elem is not None and text_elem.text:
-                try:
-                    weight = int(text_elem.text)
-                except ValueError:
-                    weight = 1
-            else:
-                weight = 1
-        else:
-            weight = 1
-
-        net.arcs.append((source, target, weight))
-
+    # get places
+    for place in net_pm4py.places:
+        id = place.name
+        token = initial_marking[place] if place in initial_marking else 0
+        net.places[id] = token
+    # get transitions
+    for transition in net_pm4py.transitions:
+        trans_id = transition.name
+        label = transition.label if transition.label is not None else transition.name
+        net.transitions[trans_id] = label
+    # get arcs    
+    for arc in net_pm4py.arcs:
+        source_id = arc.source.name
+        target_id = arc.target.name
+        weight = arc.weight if hasattr(arc, 'weight') and arc.weight is not None else 1
+        net.arcs.append((source_id, target_id, weight))
     return net
-
-
 
 # task 2
 
@@ -522,8 +483,7 @@ def build_cost_bdd(manager, curr_vars, cost_list, threshold):
 net = read_pnmlFile("./file_test/small.pnml")
 print("Task 1:\n",net)
 
-print("\n\n\ndraw_net")
-net.draw_net()
+
 
 print("\n\n\nPrint a petri")
 # task 2
