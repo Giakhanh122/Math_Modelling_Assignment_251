@@ -3,14 +3,16 @@ import psutil
 import os
 import time
 import xml.etree.ElementTree as et
-from collections import defaultdict, namedtuple
 
-# BDD
-import pyeda.inter as pyeda
-from pyeda.inter import exprvars,bddvars, expr, expr2bdd
+# BDD - using dd instead of pyeda
+import dd.autoref as bdd
 
 # ILP
 import pulp
+
+
+import matplotlib.pyplot as plt
+import networkx as nx
 
 class PetriNet:
     def __init__(self):
@@ -43,15 +45,16 @@ class PetriNet:
 def read_pnmlFile(filepath: str) -> PetriNet:
     tree = et.parse(filepath)
     root = tree.getroot()
-    
+
     net = PetriNet()
-    
-    #   delete namespace 
+
+    # remove namespace
     for elem in root.iter():
         if '}' in elem.tag:
-            elem.tag = elem.tag.split('}', 1)[1]  # remove namespace
-    
-    #   find all place 
+            elem.tag = elem.tag.split('}', 1)[1]
+
+
+    # find all places
     for place in root.findall(".//place"):
         pid = place.get("id")
         initial_marking = place.find("initialMarking")
@@ -63,8 +66,8 @@ def read_pnmlFile(filepath: str) -> PetriNet:
                 net.places[pid] = "0"
         else:
             net.places[pid] = "0"
-    
-    #   find all transition 
+
+    # find all transitions
     for tran in root.findall(".//transition"):
         tid = tran.get("id")
         name_elem = tran.find("name")
@@ -76,12 +79,12 @@ def read_pnmlFile(filepath: str) -> PetriNet:
                 net.transitions[tid] = tid
         else:
             net.transitions[tid] = tid
-    
-    #   find all arc 
+
+    # find all arcs
     for arc in root.findall(".//arc"):
         source = arc.get("source")
         target = arc.get("target")
-        
+
         inscription = arc.find("inscription")
         if inscription is not None:
             text_elem = inscription.find("text")
@@ -94,15 +97,76 @@ def read_pnmlFile(filepath: str) -> PetriNet:
                 weight = 1
         else:
             weight = 1
-        
+
         net.arcs.append((source, target, weight))
-    
+
     return net
+
+
+def draw_Petri_net(petri):
+    G = nx.DiGraph()
+
+    # Thêm nodes
+    for pid in petri.places.keys():
+        G.add_node(pid, type='place', tokens=petri.places[pid])
+
+    for tid in petri.transitions.keys():
+        G.add_node(tid, type='transition', name=petri.transitions[tid])
+
+    # Thêm edges
+    for source, target, weight in petri.arcs:
+        G.add_edge(source, target, weight=weight)
+
+    # Vẽ đồ thị
+    plt.figure(figsize=(10, 8))
+
+    # Xác định vị trí nodes
+    pos = nx.spring_layout(G, seed=42)
+
+    # Tách places và transitions để vẽ với màu khác nhau
+    places = [node for node in G.nodes() if G.nodes[node]['type'] == 'place']
+    transitions = [node for node in G.nodes() if G.nodes[node]['type'] == 'transition']
+
+    # Vẽ places (hình tròn)
+    nx.draw_networkx_nodes(G, pos, nodelist=places,
+                          node_color='lightblue',
+                          node_size=1000,
+                          node_shape='o')
+
+    # Vẽ transitions (hình vuông)
+    nx.draw_networkx_nodes(G, pos, nodelist=transitions,
+                          node_color='lightgreen',
+                          node_size=1000,
+                          node_shape='s')
+
+    # Vẽ edges
+    nx.draw_networkx_edges(G, pos, arrowstyle='->', arrowsize=20)
+
+    # Thêm labels với thông tin
+    labels = {}
+    for node in G.nodes():
+        if G.nodes[node]['type'] == 'place':
+            labels[node] = f"{node}\n({G.nodes[node]['tokens']})"
+        else:
+            labels[node] = G.nodes[node]['name']
+
+    nx.draw_networkx_labels(G, pos, labels, font_size=10)
+
+    # Thêm trọng số trên edges
+    edge_labels = nx.get_edge_attributes(G, 'weight')
+    nx.draw_networkx_edge_labels(G, pos, edge_labels)
+
+    plt.title("Petri Net")
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+
 
 # task 2
 
-
-def all_reachable_marking(net : PetriNet)->list[dict]:
+def all_reachable_marking(net: PetriNet) -> list[dict]:
+    # Build input/output structures
     inp = {}
     outp = {}
     inp_w = {}
@@ -116,208 +180,198 @@ def all_reachable_marking(net : PetriNet)->list[dict]:
             outp.setdefault(source, []).append(target)
             outp_w[(source, target)] = w
 
-    ini = {p : int(count) for p, count in net.places.items()}
-    visited = [ini]
+    # Initial marking
+    initial = {p: int(count) for p, count in net.places.items()}
+    visited = [initial]
 
+    # BFS exploration
     queue = Queue()
-    queue.put(ini)
+    queue.put(initial)
 
     while not queue.empty():
-        marking  = queue.get()
+        marking = queue.get()
         for tran in net.transitions:
             tran_in = inp.get(tran, [])
             tran_out = outp.get(tran, [])
 
+            # Check if transition is enabled
             fire = all(marking[p] >= inp_w.get((p, tran), 1) for p in tran_in)
             fire = fire and all(marking[p] == 0 for p in tran_out if p not in tran_in)
-            
+
             if fire:
                 new_marking = dict(marking)
-                for i in tran_in:
-                    new_marking[i] -= inp_w[(i, tran)]
-                for o in tran_out:
-                    new_marking[o] += outp_w.get((tran, o), 1)
+                # Consume tokens from input places
+                for p in tran_in:
+                    new_marking[p] -= inp_w[(p, tran)]
+                # Produce tokens to output places
+                for p in tran_out:
+                    new_marking[p] += outp_w.get((tran, p), 1)
+
                 if new_marking not in visited:
                     visited.append(new_marking)
                     queue.put(new_marking)
 
     return visited
 
-
 # task 3
 
-
-def bbd(net: PetriNet, verbose : bool = False):
-    # time
+def bbd(net: PetriNet, verbose: bool = False):
     start_time = time.time()
-    # memory 
     process = psutil.Process(os.getpid())
     memory_before = process.memory_info().rss / 1024 / 1024  # MB
 
+    # Create BDD manager
+    manager = bdd.BDD()
 
-    places_id = {j: i for i, j in enumerate(sorted(net.places.keys()))}
-    n = len(places_id)
-
-    curr = pyeda.bddvars('curr', n)
-    next = pyeda.bddvars('next', n)
-
-    R = curr[0] | ~curr[0]
-    
-    for i in net.places:
-        id = places_id[i]
-        val = net.places[i]
-        if int(val) == 1:
-            R &= curr[id]
-        else:
-            R &= ~curr[id]
-
-    inVar = {tran: [] for tran in net.transitions}
-    outVar = {tran: [] for tran in net.transitions}
-
-    for s, t, w in net.arcs:
-        if s in net.places and t in net.transitions:
-            inVar.setdefault(t, []).append(s)
-        elif s in net.transitions and t in net.places:
-            outVar.setdefault(s, []).append(t)
-
-    T = curr[0] & ~curr[0]
-
-    for i in net.transitions:
-        T_temp = curr[0] | ~curr[0]
-        inVar_id = {places_id[j] for j in inVar.get(i, [])}
-        outVar_id = {places_id[j] for j in outVar.get(i, [])}
-
-        for j in inVar_id:
-            T_temp &= curr[j]
-
-        for j in outVar_id:
-            if j not in inVar_id:
-                T_temp &= ~curr[j]
-
-        for j in range(n):
-            inInVar = j in inVar_id
-            inOutVar = j in outVar_id
-
-            if inInVar and not inOutVar:
-                T_temp &= ~next[j]
-            elif not inInVar and inOutVar:
-                T_temp &= next[j]
-            elif inInVar and inOutVar:
-                T_temp &= next[j]
-            elif not inInVar and not inOutVar:
-                T_temp &= (next[j] & curr[j]) | (~next[j] & ~curr[j])
-
-        T |= T_temp
-    
-    
-    trans = {j: i for i, j in zip(curr, next)}
-
-    while True:
-        R_curr = R
-
-        R_img = (R & T).smoothing(curr)
-
-        R_next = R_img.compose(trans)
-            
-        R = R | R_next
-
-        if R == R_curr:
-            break
-    
-    memory_after = process.memory_info().rss / 1024 / 1024  # MB    
-    memory_used = memory_after - memory_before
-    running_time = time.time() - start_time
-    if verbose:
-        print(f"reachable markings : {R.satisfy_count()}")
-        print(f"Running_time : {running_time:.6f} s")
-        print(f"Memory before: {memory_before:.2f} MB")
-        print(f"Memory after : {memory_after:.2f} MB")
-        print(f"Memory used  : {memory_used:.2f} MB")  # ⭐ QUAN TRỌNG NHẤT
-    return R, R.satisfy_count()   
-
-
-
-# task 4 
-
-
-# ---------------------------
-# NEW: detect deadlock combining BDD & ILP 
-# ---------------------------
-def _enumerate_bdd_markings(R, net):
-    """
-    Trả về danh sách marking (list[dict]) theo cùng thứ tự places sorted(net.places.keys()).
-    Sử dụng R.satisfy_all() nếu có, fallback bằng satisfy_one + blocking clause nếu cần.
-    """
+    # Sort places for consistent ordering
     places_list = sorted(net.places.keys())
     n = len(places_list)
-    curr_vars = pyeda.bddvars('curr', n)
 
+    # Create variables: current and next states
+    curr_vars = [f"c_{i}" for i in range(n)]
+    next_vars = [f"n_{i}" for i in range(n)]
+
+    all_vars = curr_vars + next_vars
+    manager.declare(*all_vars)
+
+    # Create BDD for initial marking
+    initial_marking = {p: int(net.places[p]) for p in places_list}
+    R = manager.true
+
+    for i, place in enumerate(places_list):
+        var = curr_vars[i]
+        if initial_marking[place] == 1:
+            R &= manager.add_expr(var)
+        else:
+            R &= manager.add_expr(f"~{var}")
+
+    # Build transition relation T
+    # Precompute input/output places for each transition
+    inp = {}
+    outp = {}
+    for source, target, w in net.arcs:
+        if source in net.places and target in net.transitions:
+            inp.setdefault(target, []).append(source)
+        elif source in net.transitions and target in net.places:
+            outp.setdefault(source, []).append(target)
+
+    # Start with false, accumulate transitions
+    T = manager.false
+
+    for tran in net.transitions:
+        tran_in = inp.get(tran, [])
+        tran_out = outp.get(tran, [])
+
+        # Get indices for places
+        in_indices = [places_list.index(p) for p in tran_in]
+        out_indices = [places_list.index(p) for p in tran_out]
+
+        # Build transition BDD for this transition
+        tran_bdd = manager.true
+
+        # Condition 1: Input places must have at least 1 token
+        for idx in in_indices:
+            tran_bdd &= manager.add_expr(curr_vars[idx])
+
+        # Condition 2: Output places not in input must be empty
+        for idx in out_indices:
+            if idx not in in_indices:
+                tran_bdd &= manager.add_expr(f"~{curr_vars[idx]}")
+
+        # Condition 3: Update tokens
+        for i in range(n):
+            curr_var = curr_vars[i]
+            next_var = next_vars[i]
+
+            if i in in_indices and i not in out_indices:
+                # Token consumed
+                tran_bdd &= manager.add_expr(f"~{next_var}")
+            elif i not in in_indices and i in out_indices:
+                # Token produced
+                tran_bdd &= manager.add_expr(next_var)
+            elif i in in_indices and i in out_indices:
+                # Token stays (self-loop)
+                tran_bdd &= manager.add_expr(f"({curr_var} & {next_var}) | (~{curr_var} & ~{next_var})")
+            else:
+                # Place not involved in transition
+                tran_bdd &= manager.add_expr(f"({curr_var} & {next_var}) | (~{curr_var} & ~{next_var})")
+
+        T |= tran_bdd
+
+    # Compute reachable states using fixed point iteration
+    R_old = None
+    while R_old != R:
+        R_old = R
+
+        # Image computation: ∃curr. (R & T)
+        # We need to rename next_vars to curr_vars for the image
+        image = manager.let({next_vars[i]: curr_vars[i] for i in range(n)},
+                           manager.quantify(R & T, curr_vars, forall=False))
+
+        R |= image
+
+    # Count reachable states
+    count = manager.count(R, nvars=n)
+
+    memory_after = process.memory_info().rss / 1024 / 1024
+    memory_used = memory_after - memory_before
+    running_time = time.time() - start_time
+
+    if verbose:
+        print(f"Reachable markings: {count}")
+        print(f"Running time: {running_time:.6f} s")
+        print(f"Memory before: {memory_before:.2f} MB")
+        print(f"Memory after: {memory_after:.2f} MB")
+        print(f"Memory used: {memory_used:.2f} MB")
+
+    return R, count, manager, curr_vars
+
+# Helper function to enumerate markings from BDD
+def enumerate_bdd_markings(R, manager, curr_vars, places_list):
+    """Enumerate all markings from a BDD."""
     markings = []
-    try:
-        gen = R.satisfy_all()
-        for ass in gen:
-            mark = {}
-            for i, v in enumerate(curr_vars):
-                val = ass.get(v, 0)
-                mark[places_list[i]] = 1 if val else 0
-            markings.append(mark)
-        return markings
-    except Exception:
-        R_copy = R
-        while True:
-            one = R_copy.satisfy_one()
-            if one is None:
-                break
-            mark = {}
-            for i, v in enumerate(curr_vars):
-                val = one.get(v, 0)
-                mark[places_list[i]] = 1 if val else 0
-            markings.append(mark)
-            block = None
-            for i, v in enumerate(curr_vars):
-                lit = v if mark[places_list[i]] == 1 else ~v
-                block = lit if block is None else (block & lit)
-            if block is None:
-                break
-            R_copy = R_copy & ~block
-        return markings
 
-# ----------------------------
-# ILP + BDD deadlock detection
-# - Build BDD reachable R and enumerate markings M = {m1,...,mK}
-# - Build ILP with binary selection z_k for each marking
-# - For each transition t, compute e_tk = 1 if marking k enables t (considering same enable rules as BDD)
-# - Introduce y_t (binary) indicating enabled in selected marking
-# - Constraints:
-#     sum_k z_k == 1
-#     for each t: y_t <= sum_k e_tk * z_k
-#                for each k with e_tk==1: y_t >= z_k
-#     deadlock constraint: sum_t y_t == 0
-# - If feasible => found dead reachable marking
-# ----------------------------
-#
+    # Convert BDD to list of assignments
+    assignments = manager.pick_iter(R, care_vars=curr_vars)
 
-def detect_deadlock_bdd_ilp(net: PetriNet, timeout_seconds: int = None, verbose: bool = False):
+    for assign in assignments:
+        marking = {}
+        for i, place in enumerate(places_list):
+            var = curr_vars[i]
+            marking[place] = 1 if assign[var] else 0
+        markings.append(marking)
+
+    return markings
+
+# task 4
+
+def detect_deadlock_bdd_ilp(net: PetriNet, verbose: bool = False , timeout_seconds: int = None):
     """
-    Kết hợp BDD (tập reachable) và ILP:
-      - Lấy R = bdd(net)
-      - Liệt kê tất cả marking reachable (theo R)
-      - Dùng ILP chọn 1 marking reachable sao cho không có transition nào enabled
-    Trả về (found: bool, marking: dict|None)
+    Combine BDD (reachable set) and ILP:
+      - Get R = compute_reachable_bdd(net)
+      - Enumerate all reachable markings
+      - Use ILP to select 1 reachable marking where no transition is enabled
+    Returns (found: bool, marking: dict|None)
     """
     start_time = time.time()
 
-    R, count = bbd(net)
+    # Compute reachable set using BDD
+    R, count, manager, curr_vars = bbd(net, verbose)
     if verbose:
         print(f"[BDD] satisfy_count = {count}")
 
-    markings = _enumerate_bdd_markings(R, net)
+    # Get places list
+    places_list = sorted(net.places.keys())
+
+    # Enumerate markings
+    markings = enumerate_bdd_markings(R, manager, curr_vars, places_list)
     if verbose:
         print(f"[BDD] Enumerated {len(markings)} markings")
 
     if len(markings) == 0:
         return False, None
 
+    # Build input/output structures for enable check
     inp = {}
     outp = {}
     inp_w = {}
@@ -330,179 +384,209 @@ def detect_deadlock_bdd_ilp(net: PetriNet, timeout_seconds: int = None, verbose:
             outp.setdefault(s, []).append(t)
             outp_w[(s, t)] = w
 
+    # Precompute which transitions are enabled in each marking
     K = len(markings)
-    e_tk = {t: [0]*K for t in net.transitions}
+    e_tk = {t: [0] * K for t in net.transitions}
+
     for k, m in enumerate(markings):
         for t in net.transitions:
             tran_in = inp.get(t, [])
             tran_out = outp.get(t, [])
+
+            # Check if transition is enabled
             fire = all(m[p] >= inp_w.get((p, t), 1) for p in tran_in)
             fire = fire and all(m[p] == 0 for p in tran_out if p not in tran_in)
+
             e_tk[t][k] = 1 if fire else 0
 
+    # Build ILP problem
     prob = pulp.LpProblem("deadlock_detection", pulp.LpMinimize)
-    prob += 0 
+    prob += 0  # Dummy objective
 
+    # Variables: z_k = 1 if marking k is selected
     z = [pulp.LpVariable(f"z_{k}", lowBound=0, upBound=1, cat='Binary') for k in range(K)]
-    prob += pulp.lpSum(z) == 1
+    prob += pulp.lpSum(z) == 1  # Select exactly one marking
 
+    # Variables: y_t = 1 if transition t is enabled in selected marking
     y = {t: pulp.LpVariable(f"y_{t}", lowBound=0, upBound=1, cat='Binary') for t in net.transitions}
 
+    # Constraints linking y_t and z_k
     for t in net.transitions:
+        # y_t <= sum_k e_tk * z_k
         prob += y[t] <= pulp.lpSum(e_tk[t][k] * z[k] for k in range(K))
+
+        # For each marking where t is enabled: y_t >= z_k
         for k in range(K):
             if e_tk[t][k] == 1:
                 prob += y[t] >= z[k]
 
+    # Deadlock constraint: no transition enabled
     prob += pulp.lpSum(y[t] for t in net.transitions) == 0
 
-    # Bỏ thông báo solver hoàn toàn
-    solver = pulp.PULP_CBC_CMD(msg=0, timeLimit=timeout_seconds) if timeout_seconds else pulp.PULP_CBC_CMD(msg=0)
-    res = prob.solve(solver)
+    # Solve
+    if timeout_seconds:
+        solver = pulp.PULP_CBC_CMD(msg=0, timeLimit=timeout_seconds)
+    else:
+        solver = pulp.PULP_CBC_CMD(msg=0)
+
+    prob.solve(solver)
     status = pulp.LpStatus[prob.status]
 
     running_time = time.time() - start_time
-    
+
+    if verbose:
+        print(f"Running time: {running_time:.6f} s")
+
     if status in ("Optimal", "Feasible"):
+        # Find the selected marking
         chosen = None
         for k in range(K):
-            val = pulp.value(z[k])
-            if val is not None and val > 0.5:
+            if pulp.value(z[k]) > 0.5:
                 chosen = k
                 break
-        if chosen is None:
-            vals = [pulp.value(var) for var in z]
-            chosen = max(range(K), key=lambda i: 0 if vals[i] is None else vals[i])
 
-        if verbose:
-            print(f"Running time: {running_time:.6f} s")
-            print(f"Deadlock marking: {markings[chosen]}")
-        
-        return True, markings[chosen]
-    else:
-        if verbose:
-            print(f"Running time: {running_time:.6f} s")
-            print(f"No deadlock found")
-        return False, None
+        if chosen is not None:
+            if verbose:
+                print(f"Deadlock marking found: {markings[chosen]}")
+            return True, markings[chosen]
+
+    if verbose:
+        print("No deadlock found")
+    return False, None
 
 # task 5
 
-
 def optimize_reachable_marking(net: PetriNet, cost_list, verbose=False):
-    
     start_time = time.time()
 
-    places = sorted(net.places.keys())
-    n = len(places)
-    
+    places_list = sorted(net.places.keys())
+    n = len(places_list)
+
     if len(cost_list) != n:
-        raise ValueError("Cost list phải đúng bằng số lượng places")
-    
+        raise ValueError(f"Cost list must have exactly {n} elements (one per place)")
+
     if verbose:
-        print(f"[Binary Search] Places: {places}")
+        print(f"[Binary Search] Places: {places_list}")
         print(f"[Binary Search] Costs: {cost_list}")
-    
-    # 1. Tính min và max cost có thể
-    min_possible_cost = 0
-    max_possible_cost = sum(cost_list)  # Tất cả places đều có token
-    
-    # 2. Lấy BDD reachable
-    R, total_count = bbd(net)
+
+    # Compute reachable set using BDD
+    R, total_count, manager, curr_vars = bbd(net, verbose)
     if verbose:
         print(f"[Binary Search] Total reachable states: {total_count}")
-    
-    # 3. Binary search
-    low, high = min_possible_cost, max_possible_cost
+
+    # Binary search for optimal cost
+    min_cost = 0
+    max_cost = sum(cost_list)
+
     best_marking = None
     best_cost = -1
-    
-    curr_vars = pyeda.bddvars('curr', n)
-    
+
+    # Helper function to check if there exists a marking with cost >= threshold
+    def exists_marking_with_cost(threshold):
+        # Build BDD for cost condition: sum(cost[i] * token[i]) >= threshold
+        cost_bdd = build_cost_bdd(manager, curr_vars, cost_list, threshold)
+
+        # Check intersection with reachable states
+        intersection = R & cost_bdd
+        return not intersection == manager.false
+
+    # Binary search loop
+    low, high = min_cost, max_cost
     while low <= high:
         mid = (low + high) // 2
         if verbose:
             print(f"[Binary Search] Testing cost >= {mid} (range [{low}, {high}])")
-        
-        # Tạo BDD condition: cost >= mid
-        cost_condition = create_cost_condition_bdd(curr_vars, places, cost_list, mid)
-        
-        # Kiểm tra: có marking nào vừa reachable vừa thỏa cost >= mid?
-        exists = (R & cost_condition).satisfy_count() > 0
-        
-        if exists:
-            # Tồn tại marking thỏa điều kiện → tăng lower bound
+
+        if exists_marking_with_cost(mid):
+            # Found marking with cost >= mid
             if verbose:
                 print(f"  ✓ EXISTS marking with cost >= {mid}")
             best_cost = mid
             low = mid + 1
-            
-            # Lưu một marking thỏa điều kiện (dùng cho kết quả cuối)
-            one_marking = (R & cost_condition).satisfy_one()
-            if one_marking:
-                best_marking = decode_marking(one_marking, curr_vars, places)
+
+            # Get one such marking
+            cost_bdd = build_cost_bdd(manager, curr_vars, cost_list, mid)
+            intersection = R & cost_bdd
+            assignment = manager.pick(intersection)
+
+            if assignment:
+                best_marking = {}
+                for i, place in enumerate(places_list):
+                    var = curr_vars[i]
+                    best_marking[place] = 1 if assignment[var] else 0
         else:
-            # Không tồn tại → giảm upper bound
+            # No marking with cost >= mid
             if verbose:
                 print(f"  ✗ NO marking with cost >= {mid}")
             high = mid - 1
-    
-    running_time = time.time()-start_time
+
+    running_time = time.time() - start_time
+
     if verbose:
         print(f"[Binary Search] Optimal cost: {best_cost}")
         print(f"[Binary Search] Optimal marking: {best_marking}")
-        print(f"[Binary Search] running_time: {running_time: .6f} s")
-    
+        print(f"[Binary Search] Running time: {running_time:.6f} s")
+
     return best_marking is not None, best_marking, best_cost
 
-def create_cost_condition_bdd(curr_vars, places, cost_list, threshold):
-    """
-    Tạo BDD biểu diễn điều kiện: sum(cost[i] * token[i]) >= threshold
-    """
-    n = len(places)
-    
-    # Đệ quy/tách để tạo điều kiện (tránh tạo biểu thức quá lớn)
-    def create_condition_for_cost(target, start_idx):
-        if target <= 0:
-            # Đã đạt target → luôn true
-            return expr(True)
-        if start_idx >= n:
-            # Hết places mà chưa đạt target → false
-            return expr(False)
-        
-        current_place_cost = cost_list[start_idx]
-        current_var = curr_vars[start_idx]
-        
-        # Case 1: Place này có token (cost được cộng)
-        with_token = current_var & create_condition_for_cost(
-            target - current_place_cost, start_idx + 1
-        )
-        
-        # Case 2: Place này không có token (cost không thay đổi)
-        without_token = ~current_var & create_condition_for_cost(
-            target, start_idx + 1
-        )
-        
-        return with_token | without_token
-    
-    return create_condition_for_cost(threshold, 0)
+def build_cost_bdd(manager, curr_vars, cost_list, threshold):
+    """Build BDD for condition: sum(cost[i] * token[i]) >= threshold"""
+    n = len(curr_vars)
 
-def decode_marking(bdd_assignment, curr_vars, places):
-    """Chuyển BDD assignment thành marking dictionary"""
-    marking = {}
-    for i, place in enumerate(places):
-        val = bdd_assignment.get(curr_vars[i], 0)
-        marking[place] = 1 if val else 0
-    return marking
+    # Use dynamic programming to build the BDD
+    # dp[i][c] = BDD for achieving cost c with first i places
+
+    # Initialize with false
+    dp = {0: manager.true}  # cost 0 is always achievable (all places empty)
+
+    for i in range(n):
+        cost = cost_list[i]
+        var = curr_vars[i]
+        new_dp = {}
+
+        for current_cost, bdd_expr in dp.items():
+            # Case 1: place i is empty
+            empty_cost = current_cost
+            empty_bdd = bdd_expr & manager.add_expr(f"~{var}")
+
+            if empty_cost in new_dp:
+                new_dp[empty_cost] |= empty_bdd
+            else:
+                new_dp[empty_cost] = empty_bdd
+
+            # Case 2: place i has token
+            token_cost = current_cost + cost
+            token_bdd = bdd_expr & manager.add_expr(var)
+
+            if token_cost in new_dp:
+                new_dp[token_cost] |= token_bdd
+            else:
+                new_dp[token_cost] = token_bdd
+
+        dp = new_dp
+
+    # Combine all costs >= threshold
+    result = manager.false
+    for cost, bdd_expr in dp.items():
+        if cost >= threshold:
+            result |= bdd_expr
+
+    return result
 
 
 
 
 
+# test code
 
-# task 1
-net = read_pnmlFile("./file_test/medium_petri_net.pnml")
+   # task 1
+net = read_pnmlFile("./file_test/small.pnml")
 print("Task 1:\n",net)
-# task 2 
+
+
+print("\n\n\nPrint a petri")
+draw_Petri_net(net)
+# task 2
 all_marking = all_reachable_marking(net)
 print("\n\n\nTask 2 : all_reachable_marking:")
 for x in all_marking:
@@ -522,13 +606,12 @@ bdd_marking = bbd(net,True)
 
 # task 4
 print("\n\n\nTask 4:")
-found, m = detect_deadlock_bdd_ilp(net, 30, True)
+found, m = detect_deadlock_bdd_ilp(net, True)
 # if found:
 #     print("Deadlock detected !")
 
 
 print("\n\nTask 5:")
-cost = [2, 3, 1, 4, 5, 2, 3, 1, 4, 5, 2, 3]  # phải đúng số lượng places
+cost = [2, 3, 1, 4, 5, 2, 3, 1, 4, 5]  # phải đúng số lượng places
 
 found, marking, opt_value = optimize_reachable_marking(net, cost, True)
-
