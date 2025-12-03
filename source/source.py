@@ -11,8 +11,7 @@ import dd.autoref as bdd
 import pulp
 
 
-import matplotlib.pyplot as plt
-import networkx as nx
+
 
 class PetriNet:
     def __init__(self):
@@ -38,8 +37,7 @@ class PetriNet:
         result.append("=====================")
         return "\n".join(result)
 
-
-
+   
 # task 1
 
 def read_pnmlFile(filepath: str) -> PetriNet:
@@ -101,65 +99,6 @@ def read_pnmlFile(filepath: str) -> PetriNet:
         net.arcs.append((source, target, weight))
 
     return net
-
-
-def draw_Petri_net(petri):
-    G = nx.DiGraph()
-
-    # Thêm nodes
-    for pid in petri.places.keys():
-        G.add_node(pid, type='place', tokens=petri.places[pid])
-
-    for tid in petri.transitions.keys():
-        G.add_node(tid, type='transition', name=petri.transitions[tid])
-
-    # Thêm edges
-    for source, target, weight in petri.arcs:
-        G.add_edge(source, target, weight=weight)
-
-    # Vẽ đồ thị
-    plt.figure(figsize=(10, 8))
-
-    # Xác định vị trí nodes
-    pos = nx.spring_layout(G, seed=42)
-
-    # Tách places và transitions để vẽ với màu khác nhau
-    places = [node for node in G.nodes() if G.nodes[node]['type'] == 'place']
-    transitions = [node for node in G.nodes() if G.nodes[node]['type'] == 'transition']
-
-    # Vẽ places (hình tròn)
-    nx.draw_networkx_nodes(G, pos, nodelist=places,
-                          node_color='lightblue',
-                          node_size=1000,
-                          node_shape='o')
-
-    # Vẽ transitions (hình vuông)
-    nx.draw_networkx_nodes(G, pos, nodelist=transitions,
-                          node_color='lightgreen',
-                          node_size=1000,
-                          node_shape='s')
-
-    # Vẽ edges
-    nx.draw_networkx_edges(G, pos, arrowstyle='->', arrowsize=20)
-
-    # Thêm labels với thông tin
-    labels = {}
-    for node in G.nodes():
-        if G.nodes[node]['type'] == 'place':
-            labels[node] = f"{node}\n({G.nodes[node]['tokens']})"
-        else:
-            labels[node] = G.nodes[node]['name']
-
-    nx.draw_networkx_labels(G, pos, labels, font_size=10)
-
-    # Thêm trọng số trên edges
-    edge_labels = nx.get_edge_attributes(G, 'weight')
-    nx.draw_networkx_edge_labels(G, pos, edge_labels)
-
-    plt.title("Petri Net")
-    plt.axis('off')
-    plt.tight_layout()
-    plt.show()
 
 
 
@@ -583,9 +522,10 @@ def build_cost_bdd(manager, curr_vars, cost_list, threshold):
 net = read_pnmlFile("./file_test/small.pnml")
 print("Task 1:\n",net)
 
+print("\n\n\ndraw_net")
+net.draw_net()
 
 print("\n\n\nPrint a petri")
-draw_Petri_net(net)
 # task 2
 all_marking = all_reachable_marking(net)
 print("\n\n\nTask 2 : all_reachable_marking:")
@@ -614,4 +554,4 @@ found, m = detect_deadlock_bdd_ilp(net, True)
 print("\n\nTask 5:")
 cost = [2, 3, 1, 4, 5, 2, 3, 1, 4, 5]  # phải đúng số lượng places
 
-found, marking, opt_value = optimize_reachable_marking(net, cost, True)
+# found, marking, opt_value = optimize_reachable_marking(net, cost, True)

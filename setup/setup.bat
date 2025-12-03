@@ -1,6 +1,18 @@
 @echo off
-set VENV=test
-if not exist %VENV_NAME%\Scripts\activate.bat(
+:: to go cuẻnt 
+cd /d %~dp0
+cd ..
+:: Create python virtual environment
+python -m venv test
 
-)
-echo "Setup done !"
+:: Activate virtual environment
+call test\Scripts\activate
+
+:: pip upgrade
+python -m pip install --upgrade pip
+
+:: install all needed library
+pip install -r requirements.txt
+
+echo Setup done !
+pause
