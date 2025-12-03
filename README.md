@@ -1,4 +1,9 @@
-# CO2011 - Assignment: Symbolic and Algebraic Reasoning in Petri Nets
+<div align="center">
+<h1> Symbolic and Algebraic Reasoning in Petri Nets </h1>
+
+![Python](https://img.shields.io/badge/python-3.8-blue)
+![Status](https://img.shields.io/badge/status-complete-success)
+</div>
 
 ## Thông tin nhóm
 - **Môn học**: Mathematical Modeling (CO2011)
