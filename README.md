@@ -87,7 +87,7 @@
 | **deadlock_*.pnml** | Test deadlock detection | Đa dạng |
 | **loop_*.pnml** | Test cyclic behavior analysis | Đa dạng |
 ## Cài đặt
-1. Clone repository hoặc giải nén file ZIP
+1. Clone repository về máy
 2. Chạy setup môi trường python ảo để thông dịch Python
    - **Window**
    ```bash
