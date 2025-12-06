@@ -11,7 +11,8 @@ import dd.autoref as bdd
 # ILP
 import pulp
 
-
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 class PetriNet:
@@ -41,9 +42,11 @@ class PetriNet:
    
 # task 1
 
+
 def check_consistency(net : PetriNet) -> bool:
     ok = True
 
+    # must have places & transitions
     if len(net.places) == 0:
         print("No places in net")
         ok = False
@@ -51,6 +54,7 @@ def check_consistency(net : PetriNet) -> bool:
         print("No transitions in net")
         ok = False
 
+    # duplicate check
     if len(net.places) != len(set(net.places.keys())):
         print("Duplicate place IDs detected")
         ok = False
@@ -58,11 +62,19 @@ def check_consistency(net : PetriNet) -> bool:
         print("Duplicate transition IDs detected")
         ok = False
 
-    for p in net.places:
-        if not isinstance(net.places[p], int):
+    # token & 1-safe check
+    for p, tok in net.places.items():
+        if not isinstance(tok, int):
             print(f"Marking value for place {p} is not integer")
             ok = False
+        if tok < 0:
+            print(f"Negative tokens at place {p}")
+            ok = False
+        if tok > 1:
+            print(f"[1-safe violated] Place {p} has {tok} tokens (must be <= 1)")
+            ok = False
 
+    # arc validation
     place_ids = set(net.places.keys())
     trans_ids = set(net.transitions.keys())
     for s, t, w in net.arcs:
@@ -71,6 +83,9 @@ def check_consistency(net : PetriNet) -> bool:
             ok = False
         if t not in place_ids and t not in trans_ids:
             print(f"Arc target '{t}' does not exist")
+            ok = False
+        if w != 1:
+            print(f"[Invalid weight] Arc {s} -> {t} has weight {w} (must be 1)")
             ok = False
 
     if ok:
@@ -139,8 +154,18 @@ def all_reachable_marking(net: PetriNet) -> list[dict]:
             tran_out = outp.get(tran, [])
 
             # Check if transition is enabled
-            fire = all(marking[p] >= inp_w.get((p, tran), 1) for p in tran_in)
-            fire = fire and all(marking[p] == 0 for p in tran_out if p not in tran_in)
+            fire = True
+            for p in tran_in:
+                if marking[p] < inp_w.get((p, tran), 1):
+                    fire = False
+                    break
+
+
+            if fire:
+                for p in tran_out:
+                    if p not in tran_in and marking[p] > 0:
+                        fire = False
+                        break
 
             if fire:
                 new_marking = dict(marking)
@@ -395,10 +420,15 @@ def detect_deadlock_bdd_ilp(net: PetriNet, verbose: bool = False , timeout_secon
         if chosen is not None:
             if verbose:
                 print(f"Deadlock marking found: {markings[chosen]}")
+
+            # clean bbd
+            del manager
             return True, markings[chosen]
 
     if verbose:
         print("No deadlock found")
+    # clean bbd
+    del manager
     return False, None
 
 # task 5
@@ -412,6 +442,8 @@ def optimize_reachable_marking(net: PetriNet, cost_list, verbose=False):
     if len(cost_list) != n:
         raise ValueError(f"Cost list must have exactly {n} elements (one per place)")
 
+    print("Cost :", cost_list)
+    
     if verbose:
         print(f"[Binary Search] Places: {places_list}")
         print(f"[Binary Search] Costs: {cost_list}")
@@ -518,47 +550,35 @@ def build_cost_bdd(manager, curr_vars, cost_list, threshold):
         if cost >= threshold:
             result |= bdd_expr
 
+    # clean bbd
+    del manager
     return result
 
 
 
 
-
-# test code
-
-   # task 1
-net = read_pnmlFile("./file_test/deadlock_simple_1.pnml")
-print("Task 1:\n",net)
+def run(file_name : str, cost : list()):
+    net = read_pnmlFile("./file_test/" + file_name)
+    print("Task 1:\n",net)
 
 
-
-print("\n\n\nPrint a petri")
 # task 2
-all_marking = all_reachable_marking(net)
-print("\n\n\nTask 2 : all_reachable_marking:")
-for x in all_marking:
-    print(x)
+    all_marking = all_reachable_marking(net)
+    print("\n\n\nTask 2 : all_reachable_marking:")
+    for x in all_marking:
+        print(x)
 
 # task 3
-print("\n\n\nTask 3:")
-bdd_marking = bbd(net,True)
-
-
-# print("Debug task 2 + 3:")
-# a,b = test_bdd_vs_task2(net)
-#
-# print("debug task 4:")
-# # Chạy test
-# found = test_specific_deadlock_marking(net)
+    print("\n\n\nTask 3:")
+    R, count, manager, curr_vars = bbd(net, True)
+    del manager
 
 # task 4
-print("\n\n\nTask 4:")
-found, m = detect_deadlock_bdd_ilp(net, True)
+    print("\n\n\nTask 4:")
+    found, m = detect_deadlock_bdd_ilp(net, True)
 # if found:
 #     print("Deadlock detected !")
 
-
-print("\n\nTask 5:")
-cost = [2, 3, 1, 4, 5, 2, 3, 1, 4, 5]  # phải đúng số lượng places
-
-# found, marking, opt_value = optimize_reachable_marking(net, cost, True)
+# task 5
+    print("\n\nTask 5:")
+    found, marking, opt_value = optimize_reachable_marking(net, cost, True)
