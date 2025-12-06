@@ -41,6 +41,46 @@ class PetriNet:
    
 # task 1
 
+def check_consistency(net : PetriNet) -> bool:
+    ok = True
+
+    if len(net.places) == 0:
+        print("No places in net")
+        ok = False
+    if len(net.transitions) == 0:
+        print("No transitions in net")
+        ok = False
+
+    if len(net.places) != len(set(net.places.keys())):
+        print("Duplicate place IDs detected")
+        ok = False
+    if len(net.transitions) != len(set(net.transitions.keys())):
+        print("Duplicate transition IDs detected")
+        ok = False
+
+    for p in net.places:
+        if not isinstance(net.places[p], int):
+            print(f"Marking value for place {p} is not integer")
+            ok = False
+
+    place_ids = set(net.places.keys())
+    trans_ids = set(net.transitions.keys())
+    for s, t, w in net.arcs:
+        if s not in place_ids and s not in trans_ids:
+            print(f"Arc source '{s}' does not exist")
+            ok = False
+        if t not in place_ids and t not in trans_ids:
+            print(f"Arc target '{t}' does not exist")
+            ok = False
+
+    if ok:
+        print("PNML consistency check passed!")
+    else:
+        print("PNML consistency check failed!")
+
+    return ok
+
+
 def read_pnmlFile(filepath: str) -> PetriNet:
     net_pm4py, initial_marking, final_marking = pm4py.read_pnml(filepath)
 
@@ -61,7 +101,11 @@ def read_pnmlFile(filepath: str) -> PetriNet:
         target_id = arc.target.name
         weight = arc.weight if hasattr(arc, 'weight') and arc.weight is not None else 1
         net.arcs.append((source_id, target_id, weight))
-    return net
+    # check consistency
+    if(check_consistency(net)):
+        return net
+    else:
+        exit();
 
 # task 2
 
@@ -226,6 +270,10 @@ def bbd(net: PetriNet, verbose: bool = False):
 
     return R, count, manager, curr_vars
 
+
+
+
+# task 4
 # Helper function to enumerate markings from BDD
 def enumerate_bdd_markings(R, manager, curr_vars, places_list):
     """Enumerate all markings from a BDD."""
@@ -243,7 +291,6 @@ def enumerate_bdd_markings(R, manager, curr_vars, places_list):
 
     return markings
 
-# task 4
 
 def detect_deadlock_bdd_ilp(net: PetriNet, verbose: bool = False , timeout_seconds: int = None):
     """
@@ -480,7 +527,7 @@ def build_cost_bdd(manager, curr_vars, cost_list, threshold):
 # test code
 
    # task 1
-net = read_pnmlFile("./file_test/small.pnml")
+net = read_pnmlFile("./file_test/deadlock_simple_1.pnml")
 print("Task 1:\n",net)
 
 
