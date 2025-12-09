@@ -93,7 +93,7 @@
   ```
 2. Vào thư mục repo
   ``` bash
-  cd Math_Modelling_Assignment_251
+  cd .\Math_Modelling_Assignment_251\
   ```
 3. Chạy setup môi trường python ảo để thông dịch Python
    - **Window**
