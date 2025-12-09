@@ -2,10 +2,7 @@ from queue import Queue
 import psutil
 import os
 import time
-
 import pm4py
-
-# BDD - using dd instead of pyeda
 import dd.autoref as bdd
 
 # ILP
@@ -288,10 +285,14 @@ def bbd(net: PetriNet, verbose: bool = False):
 
     if verbose:
         print(f"Reachable markings: {count}")
+        markings = enumerate_bdd_markings(R, manager, curr_vars, places_list)
+        for x in markings:
+            print(x)
         print(f"Running time: {running_time:.6f} s")
         print(f"Memory before: {memory_before:.2f} MB")
         print(f"Memory after: {memory_after:.2f} MB")
         print(f"Memory used: {memory_used:.2f} MB")
+
 
     return R, count, manager, curr_vars
 
@@ -328,7 +329,7 @@ def detect_deadlock_bdd_ilp(net: PetriNet, verbose: bool = False , timeout_secon
     start_time = time.time()
 
     # Compute reachable set using BDD
-    R, count, manager, curr_vars = bbd(net, verbose)
+    R, count, manager, curr_vars = bbd(net, False)
     if verbose:
         print(f"[BDD] satisfy_count = {count}")
 
@@ -339,7 +340,6 @@ def detect_deadlock_bdd_ilp(net: PetriNet, verbose: bool = False , timeout_secon
     markings = enumerate_bdd_markings(R, manager, curr_vars, places_list)
     if verbose:
         print(f"[BDD] Enumerated {len(markings)} markings")
-
     if len(markings) == 0:
         return False, None
 
@@ -449,7 +449,7 @@ def optimize_reachable_marking(net: PetriNet, cost_list, verbose=False):
         print(f"[Binary Search] Costs: {cost_list}")
 
     # Compute reachable set using BDD
-    R, total_count, manager, curr_vars = bbd(net, verbose)
+    R, total_count, manager, curr_vars = bbd(net, False)
     if verbose:
         print(f"[Binary Search] Total reachable states: {total_count}")
 
@@ -570,7 +570,9 @@ def run(file_name : str, cost : list()):
 
 # task 3
     print("\n\n\nTask 3:")
-    R, count, manager, curr_vars = bbd(net, True)
+    R, count, manager, curr_vars = bbd(net, True) 
+    places_list = sorted(net.places.keys())
+    # Enumerate markings
     del manager
 
 # task 4
