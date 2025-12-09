@@ -557,8 +557,8 @@ def build_cost_bdd(manager, curr_vars, cost_list, threshold):
 
 
 
-def run(file_name : str, cost : list()):
-    net = read_pnmlFile("./file_test/" + file_name)
+def run(test):
+    net = read_pnmlFile("./file_test/" + test[0])
     print("Task 1:\n",net)
 
 
@@ -582,5 +582,6 @@ def run(file_name : str, cost : list()):
 #     print("Deadlock detected !")
 
 # task 5
+    
     print("\n\nTask 5:")
-    found, marking, opt_value = optimize_reachable_marking(net, cost, True)
+    found, marking, opt_value = optimize_reachable_marking(net, test[1], True)
