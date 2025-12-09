@@ -88,7 +88,14 @@
 | **loop_*.pnml** | Test cyclic behavior analysis | Đa dạng |
 ## Cài đặt
 1. Clone repository về máy
-2. Chạy setup môi trường python ảo để thông dịch Python
+  ``` bash
+  git clone https://github.com/Giakhanh122/Math_Modelling_Assignment_251
+  ```
+2. Vào thư mục repo
+  ``` bash
+  cd Math_Modelling_Assignment_251
+  ```
+4. Chạy setup môi trường python ảo để thông dịch Python
    - **Window**
    ```bash
    .\setup\setup.bat
@@ -97,7 +104,7 @@
    ```bash
    source ./setup/setup.sh
    ```
-4. Chạy file Python
+5. Chạy file Python
    ```bash
    python ./source/run.py
    ```
