@@ -99,5 +99,5 @@
    ```
 4. Chạy file Python
    ```bash
-   python ./source/source.py
+   python ./source/run.py
    ```
