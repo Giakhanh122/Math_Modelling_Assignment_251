@@ -566,7 +566,7 @@ def run(file_name : str, cost : list()):
     all_marking = all_reachable_marking(net)
     print("\n\n\nTask 2 : all_reachable_marking:")
     for x in all_marking:
-        print(x)
+        print(dict(sorted(x.items())))
 
 # task 3
     print("\n\n\nTask 3:")
