@@ -95,7 +95,7 @@
   ``` bash
   cd Math_Modelling_Assignment_251
   ```
-4. Chạy setup môi trường python ảo để thông dịch Python
+3. Chạy setup môi trường python ảo để thông dịch Python
    - **Window**
    ```bash
    .\setup\setup.bat
@@ -104,7 +104,7 @@
    ```bash
    source ./setup/setup.sh
    ```
-5. Chạy file Python
+3. Chạy file Python
    ```bash
    python ./source/run.py
    ```
