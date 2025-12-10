@@ -558,6 +558,7 @@ def build_cost_bdd(manager, curr_vars, cost_list, threshold):
 
 
 def run(test):
+    print("------ Starting test ------\n")
     net = read_pnmlFile("./file_test/" + test[0])
     print("Task 1:\n",net)
 
@@ -585,3 +586,6 @@ def run(test):
     
     print("\n\nTask 5:")
     found, marking, opt_value = optimize_reachable_marking(net, test[1], True)
+    print("\n")
+    print("------ Ending test ------\n")
+
