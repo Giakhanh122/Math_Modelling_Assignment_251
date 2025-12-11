@@ -64,30 +64,6 @@ Sơ đồ mô tả input:
 
 <img width="1122" height="912" alt="image" src="https://github.com/user-attachments/assets/dec980ef-bb39-4877-a079-c6c8fa2b620c" />
 
-**📊 Phân loại theo kích thước:**
-- **📉 small.pnml**: Mạng Petri nhỏ, ít places và transitions
-- **📈 medium.pnml**: Mạng Petri trung bình
-- **📊 medium_petri_net.pnml**: Mạng Petri trung bình (biến thể)
-- **📊 large.pnml**: Mạng Petri lớn, độ phức tạp cao
-
-**⚠️ Phân loại theo tính chất deadlock:**
-- **⚠️ deadlock_simple_1.pnml**: Deadlock cơ bản, dễ nhận diện
-- **🔄 conflict_deadlock.pnml**: Deadlock do conflict giữa các transitions
-- **🔁 loop_reach_deadlock.pnml**: Deadlock từ vòng lặp trong mạng
-- **✅ loop_safe_1.pnml**: Vòng lặp an toàn (không gây deadlock)
-
-**🧪 File testing đa năng:**
-- **test_file.pnml**: File test tổng hợp nhiều kịch bản
-
-### 🎯 Mục đích sử dụng các file test:
-
-| Loại file | Mục đích testing | Độ phức tạp |
-|-----------|------------------|-------------|
-| **small.pnml** | Unit test, debug nhanh | Thấp |
-| **medium.pnml** | Integration test | Trung bình |
-| **large.pnml** | Performance test, stress test | Cao |
-| **deadlock_*.pnml** | Test deadlock detection | Đa dạng |
-| **loop_*.pnml** | Test cyclic behavior analysis | Đa dạng |
 ## Cài đặt
 1. Clone repository về máy
   ``` bash
