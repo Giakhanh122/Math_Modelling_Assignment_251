@@ -62,7 +62,15 @@
 #### **📁 test_pnml_files/** - *Thư mục chứa dữ liệu testing mạng Petri*
 Sơ đồ mô tả input:
 
-<img width="1122" height="912" alt="image" src="https://github.com/user-attachments/assets/dec980ef-bb39-4877-a079-c6c8fa2b620c" />
+- Testcase 1:
+
+<img width="1071" height="438" alt="image" src="https://github.com/user-attachments/assets/fe0dd022-26c3-4934-a29e-8d4703ec4ae4" />
+
+- Testcase 2:
+
+<img width="945" height="505" alt="image" src="https://github.com/user-attachments/assets/0dffcb3f-1fff-4b9f-9c29-042ca6deb45d" />
+
+
 
 ## Cài đặt
 1. Clone repository về máy
