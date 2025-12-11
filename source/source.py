@@ -121,8 +121,12 @@ def read_pnmlFile(filepath: str) -> PetriNet:
 
 # task 2
 
-def all_reachable_marking(net: PetriNet) -> list[dict]:
+def all_reachable_marking(net: PetriNet, verbose=False) -> list[dict]:
     # Build input/output structures
+    start_time = time.time()
+    process = psutil.Process(os.getpid())
+    memory_before = process.memory_info().rss / 1024 / 1024  # MB
+
     inp = {}
     outp = {}
     inp_w = {}
@@ -136,48 +140,73 @@ def all_reachable_marking(net: PetriNet) -> list[dict]:
             outp.setdefault(source, []).append(target)
             outp_w[(source, target)] = w
 
+    # Places cố định thứ tự để hash marking
+    places = sorted(net.places.keys())
+
+    def marking_to_tuple(m: dict):
+        return tuple(m[p] for p in places)
+
     # Initial marking
     initial = {p: int(count) for p, count in net.places.items()}
-    visited = [initial]
+    visited_markings = [initial]                 # giữ list dict để output
+    visited_set = set()                          # dùng để check visited O(1)
+    visited_set.add(marking_to_tuple(initial))
 
-    # BFS exploration
+    # BFS
     queue = Queue()
     queue.put(initial)
 
     while not queue.empty():
         marking = queue.get()
+
         for tran in net.transitions:
             tran_in = inp.get(tran, [])
             tran_out = outp.get(tran, [])
 
-            # Check if transition is enabled
+            # Check input (enable rule đúng chuẩn PN)
             fire = True
             for p in tran_in:
                 if marking[p] < inp_w.get((p, tran), 1):
                     fire = False
                     break
 
-
             if fire:
-                for p in tran_out:
-                    if p not in tran_in and marking[p] > 0:
-                        fire = False
-                        break
-
-            if fire:
+                # Fire transition → tạo marking mới
                 new_marking = dict(marking)
-                # Consume tokens from input places
+
+                # consume
                 for p in tran_in:
                     new_marking[p] -= inp_w[(p, tran)]
-                # Produce tokens to output places
+
+                # produce
                 for p in tran_out:
                     new_marking[p] += outp_w.get((tran, p), 1)
 
-                if new_marking not in visited:
-                    visited.append(new_marking)
+                # check 1-safe (không accept marking nào có token > 1)
+                if any(v > 1 for v in new_marking.values()):
+                    continue
+
+                tup = marking_to_tuple(new_marking)
+                if tup not in visited_set:
+                    visited_set.add(tup)
+                    visited_markings.append(new_marking)
                     queue.put(new_marking)
 
-    return visited
+    # Memory/time
+    memory_after = process.memory_info().rss / 1024 / 1024
+    memory_used = memory_after - memory_before
+    running_time = time.time() - start_time
+    count = len(visited_markings)
+    print(f"Reachable markings: {count}")
+    if verbose:
+        for x in visited_markings:
+            print(dict(sorted(x.items())))
+    print(f"Running time: {running_time:.6f} s")
+    print(f"Memory before: {memory_before:.2f} MB")
+    print(f"Memory after:  {memory_after:.2f} MB")
+    print(f"Memory used:   {memory_used:.2f} MB")
+
+    return visited_markings
 
 # task 3
 
@@ -186,114 +215,119 @@ def bbd(net: PetriNet, verbose: bool = False):
     process = psutil.Process(os.getpid())
     memory_before = process.memory_info().rss / 1024 / 1024  # MB
 
-    # Create BDD manager
     manager = bdd.BDD()
 
-    # Sort places for consistent ordering
+    # Places sorted for stable ordering
     places_list = sorted(net.places.keys())
     n = len(places_list)
 
-    # Create variables: current and next states
-    curr_vars = [f"c_{i}" for i in range(n)]
-    next_vars = [f"n_{i}" for i in range(n)]
+    # Interleaving var order (c0,n0,c1,n1,...)
+    vars_order = []
+    curr_vars = []
+    next_vars = []
 
-    all_vars = curr_vars + next_vars
-    manager.declare(*all_vars)
+    for i in range(n):
+        cv = f"c_{i}"
+        nv = f"n_{i}"
+        curr_vars.append(cv)
+        next_vars.append(nv)
+        vars_order.append(cv)
+        vars_order.append(nv)
 
-    # Create BDD for initial marking
-    initial_marking = {p: int(net.places[p]) for p in places_list}
+    manager.declare(*vars_order)
+
+    # Initial marking
     R = manager.true
+    initial = {p: int(net.places[p]) for p in places_list}
 
-    for i, place in enumerate(places_list):
-        var = curr_vars[i]
-        if initial_marking[place] == 1:
-            R &= manager.add_expr(var)
+    for i, p in enumerate(places_list):
+        if initial[p] == 1:
+            R &= manager.var(curr_vars[i])
         else:
-            R &= manager.add_expr(f"~{var}")
+            R &= ~manager.var(curr_vars[i])
 
-    # Build transition relation T
-    # Precompute input/output places for each transition
+    # Precompute structure
     inp = {}
     outp = {}
-    for source, target, w in net.arcs:
-        if source in net.places and target in net.transitions:
-            inp.setdefault(target, []).append(source)
-        elif source in net.transitions and target in net.places:
-            outp.setdefault(source, []).append(target)
+    for s, t, w in net.arcs:
+        if s in net.places and t in net.transitions:
+            inp.setdefault(t, []).append(s)
+        elif s in net.transitions and t in net.places:
+            outp.setdefault(s, []).append(t)
 
-    # Start with false, accumulate transitions
-    T = manager.false
+    # Build T
+    T_all = manager.false
 
-    for tran in net.transitions:
-        tran_in = inp.get(tran, [])
-        tran_out = outp.get(tran, [])
+    for t in net.transitions:
+        t_in = inp.get(t, [])
+        t_out = outp.get(t, [])
 
-        # Get indices for places
-        in_indices = [places_list.index(p) for p in tran_in]
-        out_indices = [places_list.index(p) for p in tran_out]
+        in_idx = [places_list.index(p) for p in t_in]
+        out_idx = [places_list.index(p) for p in t_out]
 
-        # Build transition BDD for this transition
-        tran_bdd = manager.true
+        tb = manager.true
 
-        # Condition 1: Input places must have at least 1 token
-        for idx in in_indices:
-            tran_bdd &= manager.add_expr(curr_vars[idx])
+        # 1) Enabled: input places = 1
+        for i in in_idx:
+            tb &= manager.var(curr_vars[i])
 
-        # Condition 2: Output places not in input must be empty
-        for idx in out_indices:
-            if idx not in in_indices:
-                tran_bdd &= manager.add_expr(f"~{curr_vars[idx]}")
+        # 2) Output places not in input = 0
+        for i in out_idx:
+            if i not in in_idx:
+                tb &= ~manager.var(curr_vars[i])
 
-        # Condition 3: Update tokens
+        # 3) Next-state constraints (using manager.ite)
         for i in range(n):
-            curr_var = curr_vars[i]
-            next_var = next_vars[i]
+            c = manager.var(curr_vars[i])
+            nvar = manager.var(next_vars[i])
 
-            if i in in_indices and i not in out_indices:
-                # Token consumed
-                tran_bdd &= manager.add_expr(f"~{next_var}")
-            elif i not in in_indices and i in out_indices:
-                # Token produced
-                tran_bdd &= manager.add_expr(next_var)
-            elif i in in_indices and i in out_indices:
-                # Token stays (self-loop)
-                tran_bdd &= manager.add_expr(f"({curr_var} & {next_var}) | (~{curr_var} & ~{next_var})")
+            if i in in_idx and i not in out_idx:
+                # consumed → next = 0
+                tb &= ~nvar
+
+            elif i not in in_idx and i in out_idx:
+                # produced → next = 1
+                tb &= nvar
+
+            elif i in in_idx and i in out_idx:
+                # self-loop → next == curr
+                tb &= manager.ite(c, nvar, ~nvar)
+
             else:
-                # Place not involved in transition
-                tran_bdd &= manager.add_expr(f"({curr_var} & {next_var}) | (~{curr_var} & ~{next_var})")
+                # unchanged → next == curr
+                tb &= manager.ite(c, nvar, ~nvar)
 
-        T |= tran_bdd
+        T_all |= tb
 
-    # Compute reachable states using fixed point iteration
+    # Fixed-point iteration
     R_old = None
     while R_old != R:
         R_old = R
 
-        # Image computation: ∃curr. (R & T)
-        # We need to rename next_vars to curr_vars for the image
-        image = manager.let({next_vars[i]: curr_vars[i] for i in range(n)},
-                           manager.quantify(R & T, curr_vars, forall=False))
+        rename = {next_vars[i]: curr_vars[i] for i in range(n)}
+        image = manager.quantify(R & T_all, curr_vars, forall=False)
+        image = manager.let(rename, image)
 
         R |= image
 
-    # Count reachable states
-    count = manager.count(R, nvars=n)
+    # Counting reachable states
+    count = manager.count(R, n)
 
+    print(f"reachable markings: {count}")
+
+    running_time = time.time() - start_time
     memory_after = process.memory_info().rss / 1024 / 1024
     memory_used = memory_after - memory_before
-    running_time = time.time() - start_time
 
     if verbose:
-        print(f"Reachable markings: {count}")
         markings = enumerate_bdd_markings(R, manager, curr_vars, places_list)
         for x in markings:
             print(x)
-        print(f"Running time: {running_time:.6f} s")
-        print(f"Memory before: {memory_before:.2f} MB")
-        print(f"Memory after: {memory_after:.2f} MB")
-        print(f"Memory used: {memory_used:.2f} MB")
 
-
+    print(f"Running time: {running_time:.6f} s")
+    print(f"Memory before: {memory_before:.2f} MB")
+    print(f"Memory after: {memory_after:.2f} MB")
+    print(f"Memory used: {memory_used:.2f} MB")
     return R, count, manager, curr_vars
 
 
@@ -418,15 +452,14 @@ def detect_deadlock_bdd_ilp(net: PetriNet, verbose: bool = False , timeout_secon
                 break
 
         if chosen is not None:
-            if verbose:
-                print(f"Deadlock marking found: {markings[chosen]}")
+            
+            print(f"Deadlock marking found: {markings[chosen]}")
 
             # clean bbd
             del manager
             return True, markings[chosen]
 
-    if verbose:
-        print("No deadlock found")
+    print("No deadlock found")
     # clean bbd
     del manager
     return False, None
@@ -501,10 +534,10 @@ def optimize_reachable_marking(net: PetriNet, cost_list, verbose=False):
 
     running_time = time.time() - start_time
 
-    if verbose:
-        print(f"[Binary Search] Optimal cost: {best_cost}")
-        print(f"[Binary Search] Optimal marking: {best_marking}")
-        print(f"[Binary Search] Running time: {running_time:.6f} s")
+    # if verbose:
+    print(f"[Binary Search] Optimal cost: {best_cost}")
+    print(f"[Binary Search] Optimal marking: {best_marking}")
+    print(f"[Binary Search] Running time: {running_time:.6f} s")
 
     return best_marking is not None, best_marking, best_cost
 
@@ -564,28 +597,28 @@ def run(test):
 
 
 # task 2
-    all_marking = all_reachable_marking(net)
-    print("\n\n\nTask 2 : all_reachable_marking:")
-    for x in all_marking:
-        print(dict(sorted(x.items())))
+    print("\n\n\nTask 2 :Explicit (BFS)")
+    all_marking = all_reachable_marking(net, test[2])
+    
+
 
 # task 3
-    print("\n\n\nTask 3:")
-    R, count, manager, curr_vars = bbd(net, True) 
+    print("\n\n\nTask 3 :Symbolic BDD")
+    R, count, manager, curr_vars = bbd(net, test[2]) 
     places_list = sorted(net.places.keys())
     # Enumerate markings
     del manager
 
 # task 4
-    print("\n\n\nTask 4:")
-    found, m = detect_deadlock_bdd_ilp(net, True)
+    print("\n\n\nTask 4: Deadlock Detection")
+    found, m = detect_deadlock_bdd_ilp(net, test[2])
 # if found:
 #     print("Deadlock detected !")
 
 # task 5
     
-    print("\n\nTask 5:")
-    found, marking, opt_value = optimize_reachable_marking(net, test[1], True)
+    print("\n\nTask 5: Optimal")
+    found, marking, opt_value = optimize_reachable_marking(net, test[1], test[2])
     print("\n")
     print("------ Ending test ------\n")
 
