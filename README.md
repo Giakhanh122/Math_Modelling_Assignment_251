@@ -64,7 +64,7 @@ Sơ đồ mô tả input:
 
 - Testcase 1 (medium_deadlock.pnml):
 
-<img width="1071" height="438" alt="image" src="https://github.com/user-attachments/assets/fe0dd022-26c3-4934-a29e-8d4703ec4ae4" />
+<img width="1035" height="412" alt="image" src="https://github.com/user-attachments/assets/e8d0ca33-32e3-44c6-9dfd-ff9ec5f31f54" />
 
 - Testcase 2 (medium_no_deadlock.pnml):
 
