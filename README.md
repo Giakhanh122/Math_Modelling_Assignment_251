@@ -106,7 +106,8 @@ Sơ đồ mô tả input:
    ```bash
    source ./setup/setup.sh
    ```
-3. Chạy file Python
+3. Chon testcase bằng cách thay đổi đối số của hàm run trong file run.py
+4. Chạy file Python
    ```bash
    python ./source/run.py
    ```
