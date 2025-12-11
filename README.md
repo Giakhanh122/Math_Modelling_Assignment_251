@@ -21,22 +21,11 @@
 - Các thư viện cần thiết (xem `requirements.txt`)
 - Trình biên dịch C++ (nếu dùng C++), hoặc JDK (nếu dùng Java)
 ## Cấu trúc mã nguồn
-#### **📄 README.md**
-- **Mục đích**: Tài liệu hướng dẫn sử dụng project
-- **Nội dung**: Cách cài đặt, chạy chương trình, cấu trúc project, giải thích các tính năng
+
 
 #### **📋 requirements.txt**
 - **Mục đích**: Liệt kê tất cả các thư viện Python cần thiết
 - **Cách dùng**: `pip install -r requirements.txt` để cài đặt tự động
-
-#### **🖼️ image.png**
-- **Mục đích**: Hình ảnh minh họa cho project
-- **Nội dung có thể**: Sơ đồ kiến trúc, flowchart, diagram mạng Petri, kết quả phân tích 
-
-Sơ đồ mô tả input:
-
-<img width="1122" height="912" alt="image" src="https://github.com/user-attachments/assets/dec980ef-bb39-4877-a079-c6c8fa2b620c" />
-
 
 
 
@@ -65,10 +54,15 @@ Sơ đồ mô tả input:
   - Đọc và phân tích các file PNML từ thư mục `test_pnml_files/`
   - Thực hiện phân tích mạng Petri (deadlock detection, reachability, v.v.)
   - Xuất kết quả phân tích
-  - Có thể chứa các hàm xử lý đồ họa/visualization
-
+**🐍 run.py**
+- **Vai trò**: File chạy chương trình
+- **Chức năng chính**: Thực hiện chạy cả 5 tác vụ.
+  
 
 #### **📁 test_pnml_files/** - *Thư mục chứa dữ liệu testing mạng Petri*
+Sơ đồ mô tả input:
+
+<img width="1122" height="912" alt="image" src="https://github.com/user-attachments/assets/dec980ef-bb39-4877-a079-c6c8fa2b620c" />
 
 **📊 Phân loại theo kích thước:**
 - **📉 small.pnml**: Mạng Petri nhỏ, ít places và transitions
