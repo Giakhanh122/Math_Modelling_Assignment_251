@@ -62,11 +62,11 @@
 #### **📁 test_pnml_files/** - *Thư mục chứa dữ liệu testing mạng Petri*
 Sơ đồ mô tả input:
 
-- Testcase 1:
+- Testcase 1 (medium_deadlock.pnml):
 
 <img width="1071" height="438" alt="image" src="https://github.com/user-attachments/assets/fe0dd022-26c3-4934-a29e-8d4703ec4ae4" />
 
-- Testcase 2:
+- Testcase 2 (medium_no_deadlock.pnml):
 
 <img width="945" height="505" alt="image" src="https://github.com/user-attachments/assets/0dffcb3f-1fff-4b9f-9c29-042ca6deb45d" />
 
