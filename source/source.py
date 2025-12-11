@@ -323,11 +323,11 @@ def bbd(net: PetriNet, verbose: bool = False):
         markings = enumerate_bdd_markings(R, manager, curr_vars, places_list)
         for x in markings:
             print(x)
+        print(f"Running time: {running_time:.6f} s")
+        print(f"Memory before: {memory_before:.2f} MB")
+        print(f"Memory after: {memory_after:.2f} MB")
+        print(f"Memory used: {memory_used:.2f} MB")
 
-    print(f"Running time: {running_time:.6f} s")
-    print(f"Memory before: {memory_before:.2f} MB")
-    print(f"Memory after: {memory_after:.2f} MB")
-    print(f"Memory used: {memory_used:.2f} MB")
     return R, count, manager, curr_vars
 
 
