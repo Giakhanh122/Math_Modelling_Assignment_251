@@ -54,6 +54,7 @@
   - Đọc và phân tích các file PNML từ thư mục `test_pnml_files/`
   - Thực hiện phân tích mạng Petri (deadlock detection, reachability, v.v.)
   - Xuất kết quả phân tích
+
 **🐍 run.py**
 - **Vai trò**: File chạy chương trình
 - **Chức năng chính**: Thực hiện chạy cả 5 tác vụ.
