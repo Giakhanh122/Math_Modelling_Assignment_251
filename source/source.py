@@ -10,7 +10,8 @@ import pulp
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
-
+import io
+from contextlib import redirect_stdout
 
 class PetriNet:
     def __init__(self):
@@ -21,15 +22,15 @@ class PetriNet:
     def __str__(self):
         result = ["=== Petri Net Info ==="]
 
-        result.append("\nPlaces:")
+        result.append("Places:")
         for pid, tokens in self.places.items():
             result.append(f"  {pid}: tokens = {tokens}")
 
-        result.append("\nTransitions:")
+        result.append("Transitions:")
         for tid, name in self.transitions.items():
             result.append(f"  {tid}: name = {name}")
 
-        result.append("\nArcs:")
+        result.append("Arcs:")
         for arc in self.arcs:
             result.append(f"  {arc[0]} -> {arc[1]} , weight : {arc[2]}")
 
@@ -313,7 +314,7 @@ def bbd(net: PetriNet, verbose: bool = False):
     # Counting reachable states
     count = manager.count(R, n)
 
-    print(f"reachable markings: {count}")
+    print(f"Reachable markings: {count}")
 
     running_time = time.time() - start_time
     memory_after = process.memory_info().rss / 1024 / 1024
@@ -323,11 +324,11 @@ def bbd(net: PetriNet, verbose: bool = False):
         markings = enumerate_bdd_markings(R, manager, curr_vars, places_list)
         for x in markings:
             print(x)
-        print(f"Running time: {running_time:.6f} s")
-        print(f"Memory before: {memory_before:.2f} MB")
-        print(f"Memory after: {memory_after:.2f} MB")
-        print(f"Memory used: {memory_used:.2f} MB")
 
+    print(f"Running time: {running_time:.6f} s")
+    print(f"Memory before: {memory_before:.2f} MB")
+    print(f"Memory after: {memory_after:.2f} MB")
+    print(f"Memory used: {memory_used:.2f} MB")
     return R, count, manager, curr_vars
 
 
@@ -363,7 +364,8 @@ def detect_deadlock_bdd_ilp(net: PetriNet, verbose: bool = False , timeout_secon
     start_time = time.time()
 
     # Compute reachable set using BDD
-    R, count, manager, curr_vars = bbd(net, False)
+    with redirect_stdout(io.StringIO()):
+       R, count, manager, curr_vars = bbd(net, False)
     if verbose:
         print(f"[BDD] satisfy_count = {count}")
 
@@ -452,7 +454,7 @@ def detect_deadlock_bdd_ilp(net: PetriNet, verbose: bool = False , timeout_secon
                 break
 
         if chosen is not None:
-            
+
             print(f"Deadlock marking found: {markings[chosen]}")
 
             # clean bbd
@@ -482,7 +484,9 @@ def optimize_reachable_marking(net: PetriNet, cost_list, verbose=False):
         print(f"[Binary Search] Costs: {cost_list}")
 
     # Compute reachable set using BDD
-    R, total_count, manager, curr_vars = bbd(net, False)
+
+    with redirect_stdout(io.StringIO()):
+        R, total_count, manager, curr_vars = bbd(net, False)
     if verbose:
         print(f"[Binary Search] Total reachable states: {total_count}")
 
@@ -592,8 +596,11 @@ def build_cost_bdd(manager, curr_vars, cost_list, threshold):
 
 def run(test):
     print("------ Starting test ------\n")
+    print("Task 1 : Read pnml file")
     net = read_pnmlFile("./file_test/" + test[0])
-    print("Task 1:\n",net)
+
+    if test[2]:
+        print(net)
 
 
 # task 2
@@ -603,7 +610,7 @@ def run(test):
 
 
 # task 3
-    print("\n\n\nTask 3 :Symbolic BDD")
+    print("\n\n\nTask 3 :Symbolic (BDD)")
     R, count, manager, curr_vars = bbd(net, test[2]) 
     places_list = sorted(net.places.keys())
     # Enumerate markings
@@ -617,7 +624,7 @@ def run(test):
 
 # task 5
     
-    print("\n\nTask 5: Optimal")
+    print("\n\nTask 5: Optimization")
     found, marking, opt_value = optimize_reachable_marking(net, test[1], test[2])
     print("\n")
     print("------ Ending test ------\n")
